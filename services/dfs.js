@@ -1,9 +1,9 @@
 const request = require("request");
 const util = require('util');
 
-const NAMENODE_NAME = "http://ec2-35-180-37-167.eu-west-3.compute.amazonaws.com";
+const NAMENODE_HOST = "ec2-35-180-45-166.eu-west-3.compute.amazonaws.com";
 
-const DFS_NAMENODE = "http://" + NAMENODE_NAME;
+const DFS_NAMENODE = "http://" + NAMENODE_HOST;
 const DFS_DATANODE = "http://ec2-35-180-37-167.eu-west-3.compute.amazonaws.com";
 const WEBDFS_PORT = ":50070";
 
@@ -23,26 +23,27 @@ function mkdir(dirName) {
 function listDirectory(dirName) {
     return new Promise((accept, reject) => {
         request.get(DFS_NAMENODE+ WEBDFS_PORT + "/webhdfs/v1/"+dirName+"?op=LISTSTATUS", (err, response, body) => {
-                if(response.statusCode != "200") {
-                    reject("Failure when attempting to create a directory\nCuerpo: "+body);
-                } else {
-                    accept(JSON.parse(body));
-                }
-            });
+            if (response.statusCode != "200") {
+                reject("Failure when attempting to create a directory\nCuerpo: " + body);
+            } else {
+                accept(JSON.parse(body));
+            }
+        });
     });
 }
 
 function writeFile(filePath, fileBytes) {
     return new Promise((accept, reject) => {
-        request.post(DFS_NAMENODE + WEBDFS_PORT + "/webhdfs/v1/"+filePath+"?op=CREATE&user.name=ubuntu", () => {
+        request.put(DFS_NAMENODE + WEBDFS_PORT + "/webhdfs/v1/"+filePath+"?op=CREATE&user.name=ubuntu", (err, response) => {
             request.put({ 
-                url: DFS_DATANODE + ":50075" + "/webhdfs/v1/"+filePath+"?op=CREATE&user.name=ubuntu&overwrite=true",
+                url: DFS_DATANODE + ":50075" + "/webhdfs/v1/"+filePath+"?op=CREATE&user.name=ubuntu&overwrite=true&namenoderpcaddress="+NAMENODE_HOST+":9000",
                 body: fileBytes
             }, (err, response, body) => {
-                if(response.statusCode == 201) {
-                    accept();
-                } else {
+                console.log(response);
+                if(err) {
                     reject();
+                } else {
+                    accept();
                 }
             });
         });
@@ -50,9 +51,10 @@ function writeFile(filePath, fileBytes) {
 }
 
 function readFile(filePath) {
-    return new Promise((accept) => {
+    return new Promise((accept, reject) => {
         request.get(DFS_NAMENODE + WEBDFS_PORT + "/webhdfs/v1/"+filePath+"?op=OPEN&user.name=ubuntu", (err, result) => {
-            request.get(DFS_DATANODE + ":50075" + "/webhdfs/v1/"+filePath+"?op=OPEN&user.name=ubuntu&offset=0", (err, response, body) => {
+            request.get(DFS_DATANODE + ":50075" + "/webhdfs/v1/"+filePath+"?op=OPEN&user.name=ubuntu&offset=0&namenoderpcaddress="+NAMENODE_HOST+":9000", (err, response, body) => {
+                console.log(response);
                 if(err) {
                     reject(err);
                 } else {
@@ -63,9 +65,27 @@ function readFile(filePath) {
     })
 }
 
+function appendFile(filePath, newData) {
+    return new Promise((accept, reject) => {
+        request.post(DFS_NAMENODE + WEBDFS_PORT + "/webhdfs/v1/" + filePath + "?op=APPEND&user.name=ubuntu", (err, result) => {
+            request.post({
+                url: DFS_DATANODE + ":50075" + "/webhdfs/v1/" + filePath + "?op=APPEND&user.name=ubuntu&namenoderpcaddress="+NAMENODE_HOST+":9000",
+                body: newData
+            }, (err, response, body) => {
+                if(err) {
+                    reject();
+                } else {
+                    accept(response);
+                }
+            });
+        });
+    });
+}
+
 module.exports = {
     mkdir,
     listDirectory,
     writeFile,
-    readFile
+    readFile,
+    appendFile
 }
