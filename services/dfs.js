@@ -1,10 +1,10 @@
 const request = require("request");
 const util = require('util');
 
-const NAMENODE_HOST = "ec2-35-180-45-166.eu-west-3.compute.amazonaws.com";
+const NAMENODE_HOST = "ec2-35-180-45-20.eu-west-3.compute.amazonaws.com";
 
 const DFS_NAMENODE = "http://" + NAMENODE_HOST;
-const DFS_DATANODE = "http://ec2-35-180-37-167.eu-west-3.compute.amazonaws.com";
+const DFS_DATANODE = "http://ec2-35-180-83-64.eu-west-3.compute.amazonaws.com";
 const WEBDFS_PORT = ":50070";
 
 function mkdir(dirName) {
